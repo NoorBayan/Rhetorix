@@ -1,36 +1,46 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import requests
+import json
+import pandas as pd
+from json_repair import repair_json
+import pyarabic.araby as araby
 
-class OrdinalCrossEntropyLoss(nn.Module):
-    """
-    Custom Loss for Ordinal Classification.
-    Combines Standard Cross Entropy with a Distance-based Penalty.
-    """
-    def __init__(self, num_classes=3, weight=None, penalty_strength=0.5):
-        super().__init__()
-        self.num_classes = num_classes
-        self.weight = weight
-        self.penalty_strength = penalty_strength
-        # Create a distance matrix: distance[i][j] = |i - j|
-        self.distance_matrix = torch.abs(
-            torch.arange(num_classes).view(-1, 1) - torch.arange(num_classes).view(1, -1)
-        ).float()
+def clean_arabic_text(text):
+    text = str(text)
+    text = araby.strip_tashkeel(text)
+    text = araby.normalize_alef(text)
+    return text
 
-    def forward(self, logits, targets):
-        device = logits.device
-        self.distance_matrix = self.distance_matrix.to(device)
-        if self.weight is not None:
-            self.weight = self.weight.to(device)
+def load_data(url="https://raw.githubusercontent.com/NoorBayan/Burhan/main/corpus/metaphors_data.json"):
+    response = requests.get(url)
+    fixed_json_string = repair_json(response.text)
+    data = json.loads(fixed_json_string)
+
+    records = []
+    effort_map = {"Low": 0, "Medium": 1, "High": 2}
+
+    for item in data:
+        ayah = item.get('metadata', {}).get('ayah_text_uthmani', '')
+        similes = item.get('rhetorical_analysis', {}).get('similes', [])
+        
+        if not similes: continue
+        
+        for metaphor in similes:
+            classification = metaphor.get('classification', {})
+            effort = classification.get('processing_effort')
+            segment = metaphor.get('simile_identity', {}).get('segment_text', '')
             
-        # 1. Standard Categorical Loss
-        ce_loss = F.cross_entropy(logits, targets, weight=self.weight)
-        
-        # 2. Ordinal Distance Penalty
-        probs = F.softmax(logits, dim=1)
-        target_distances = self.distance_matrix[targets] # [batch_size, num_classes]
-        
-        # Penalize probabilities assigned to classes far from the true target
-        ordinal_penalty = torch.mean(torch.sum(probs * target_distances, dim=1))
-        
-        return ce_loss + (self.penalty_strength * ordinal_penalty)
+            if effort in effort_map and ayah:
+                combined_text = f"{ayah} [SEP] {segment}" if segment else ayah
+                records.append({
+                    'text': combined_text, 
+                    'label_text': effort,
+                    'label': effort_map[effort]
+                })
+                break 
+
+    df = pd.DataFrame(records)
+    df['clean_text'] = df['text'].apply(clean_arabic_text)
+    
+    label_encoder = {0: "Low", 1: "Medium", 2: "High"}
+    
+    return df, label_encoder
