@@ -1,7 +1,6 @@
 import numpy as np
 import time
 import torch
-import pandas as pd
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, set_seed
 from sklearn.model_selection import StratifiedKFold
@@ -19,7 +18,7 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
     skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     
     fold_results = []
-    oof_predictions = np.zeros(len(df)) # Out-Of-Fold predictions
+    oof_predictions = np.zeros(len(df))
     oof_true = np.zeros(len(df))
     
     total_train_time = 0
@@ -47,7 +46,7 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
             save_strategy="epoch",
             learning_rate=2e-5,
             per_device_train_batch_size=8,
-            num_train_epochs=5, # Reduced epochs for CV speed
+            num_train_epochs=5,
             load_best_model_at_end=True,
             metric_for_best_model="qwk",
             save_total_limit=1,
@@ -74,12 +73,11 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
         
         fold_results.append(eval_res)
         
-        # Save Out-Of-Fold predictions for analysis
         preds = trainer.predict(val_ds)
         oof_predictions[val_idx] = np.argmax(preds.predictions, axis=-1)
         oof_true[val_idx] = val_df['label'].values
 
-    # Aggregate Metrics across folds
+    # Aggregate Metrics
     qwk_scores = [r['eval_qwk'] for r in fold_results]
     mae_scores = [r['eval_mae'] for r in fold_results]
     f1_scores = [r['eval_macro_f1'] for r in fold_results]
