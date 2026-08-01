@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix
 import numpy as np
 
-def generate_ordinal_reports(y_true, y_pred, model_name):
+def generate_ordinal_reports(y_true, y_pred, model_name, save_dir="."):
     target_names = ["Low", "Medium", "High"]
 
     df_results = pd.DataFrame({'Actual': [target_names[int(i)] for i in y_true], 
@@ -23,8 +23,11 @@ def generate_ordinal_reports(y_true, y_pred, model_name):
     plt.ylabel('Actual Processing Effort')
     plt.xlabel('Predicted Processing Effort')
     plt.tight_layout()
-    plt.savefig(f'ordinal_cm_{model_name.replace("/", "_")}.pdf', format='pdf', bbox_inches='tight')
+    
+    save_path = f'{save_dir}/ordinal_cm_{model_name.replace("/", "_")}.pdf'
+    plt.savefig(save_path, format='pdf', bbox_inches='tight')
     plt.show()
+    print(f"✅ Figure saved to: {save_path}")
 
     errors = np.abs(y_true - y_pred)
     error_counts = pd.Series(errors).value_counts().sort_index()
