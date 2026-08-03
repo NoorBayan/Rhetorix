@@ -5,6 +5,7 @@ from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, set_seed
 from sklearn.model_selection import StratifiedKFold
 from sklearn.utils.class_weight import compute_class_weight
+from scipy.special import softmax # إضافة جديدة لحساب الاحتمالات
 from .custom_trainer import OrdinalTrainer
 from .metrics import compute_metrics
 
@@ -17,9 +18,10 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
 
     skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     
-    fold_results = []
+    fold_results_raw = [] # لحفظ نتائج كل طية بشكل مستقل
     oof_predictions = np.zeros(len(df))
     oof_true = np.zeros(len(df))
+    oof_probs = np.zeros((len(df), num_labels)) # لحفظ الاحتمالات (Logits)
     
     total_train_time = 0
     total_inf_time = 0
@@ -65,25 +67,32 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
 
         t0 = time.time()
         trainer.train()
-        total_train_time += (time.time() - t0)
+        train_time_fold = time.time() - t0
+        total_train_time += train_time_fold
 
         t1 = time.time()
         eval_res = trainer.evaluate()
-        total_inf_time += (time.time() - t1)
+        inf_time_fold = time.time() - t1
+        total_inf_time += inf_time_fold
         
-        fold_results.append(eval_res)
+        # حفظ بيانات الطية الفردية
+        eval_res['fold'] = fold + 1
+        eval_res['train_time'] = train_time_fold
+        eval_res['inf_time'] = inf_time_fold
+        fold_results_raw.append(eval_res)
         
         preds = trainer.predict(val_ds)
         oof_predictions[val_idx] = np.argmax(preds.predictions, axis=-1)
         oof_true[val_idx] = val_df['label'].values
+        oof_probs[val_idx] = softmax(preds.predictions, axis=1) # حفظ الاحتمالات
 
     # Aggregate Metrics
-    qwk_scores = [r['eval_qwk'] for r in fold_results]
-    mae_scores = [r['eval_mae'] for r in fold_results]
-    f1_scores = [r['eval_macro_f1'] for r in fold_results]
-    acc_scores = [r['eval_accuracy'] for r in fold_results]
+    qwk_scores = [r['eval_qwk'] for r in fold_results_raw]
+    mae_scores = [r['eval_mae'] for r in fold_results_raw]
+    f1_scores = [r['eval_macro_f1'] for r in fold_results_raw]
+    acc_scores = [r['eval_accuracy'] for r in fold_results_raw]
 
-    metrics = {
+    metrics_summary = {
         'QWK': f"{np.mean(qwk_scores)*100:.2f} ±{np.std(qwk_scores)*100:.2f}",
         'MAE': f"{np.mean(mae_scores):.3f} ±{np.std(mae_scores):.3f}",
         'Macro_F1': f"{np.mean(f1_scores)*100:.2f} ±{np.std(f1_scores)*100:.2f}",
@@ -92,4 +101,4 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
         'Inf_Time(s)': f"{total_inf_time:.2f}"
     }
 
-    return metrics, oof_predictions, oof_true
+    return metrics_summary, fold_results_raw, oof_predictions, oof_true, oof_probs
