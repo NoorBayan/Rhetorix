@@ -4,8 +4,6 @@
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Welcome to the official repository for the paper: **"Ordinal Learning for Cognitive Processing Effort Prediction in Classical Arabic Rhetoric: A Distance-Aware Evaluation Framework"**.
-
 This project bridges the gap between **Deep Learning (NLP)** and the **Digital Humanities**, specifically targeting Classical Arabic and Qur'anic rhetoric. We teach artificial intelligence not just to *detect* metaphors, but to measure the *cognitive effort* required for a human to interpret them.
 
 ---
