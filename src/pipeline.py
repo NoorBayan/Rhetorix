@@ -4,7 +4,7 @@ import time
 import torch
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, set_seed
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedGroupKFold # <--- [التعديل هنا]
 from sklearn.utils.class_weight import compute_class_weight
 from .custom_trainer import OrdinalTrainer
 from .metrics import compute_metrics
@@ -16,40 +16,37 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
     def tokenize_function(examples):
         return tokenizer(examples["clean_text"], truncation=True, padding="max_length", max_length=128)
 
-    # التقسيم الأساسي للـ Out-of-fold (هذا سيكون الـ Test النهائي)
-    skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    # [التعديل هنا] استخدام التقسيم المبني على المصدر للتقسيم الخارجي
+    sgkf_outer = StratifiedGroupKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     
     fold_results = []
     oof_predictions = np.zeros(len(df))
     oof_true = np.zeros(len(df))
-    oof_probs = np.zeros((len(df), num_labels)) # Added to track probabilities
+    oof_probs = np.zeros((len(df), num_labels)) 
     
     total_train_time = 0
     total_inf_time = 0
 
-    for fold, (train_val_idx, test_idx) in enumerate(skf.split(df['clean_text'], df['label'])):
+    # [التعديل هنا] تمرير الـ group_id لضمان عدم تسرب المصادر
+    for fold, (train_val_idx, test_idx) in enumerate(sgkf_outer.split(df['clean_text'], df['label'], groups=df['group_id'])):
         print(f"\n--- Training Fold {fold+1}/{k_folds} ---")
         
-        # استخراج بيانات التدريب/التقييم الداخلي وبيانات الاختبار النهائي
         train_val_df = df.iloc[train_val_idx].reset_index(drop=True)
         test_df = df.iloc[test_idx].reset_index(drop=True)
         
-        # الجديد هنا: اقتطاع 15% من بيانات التدريب لتكون Validation حقيقي لاختيار الـ Checkpoint
-        train_texts, val_texts, train_labels, val_labels = train_test_split(
-            train_val_df['clean_text'], train_val_df['label'], 
-            test_size=0.15, stratify=train_val_df['label'], random_state=seed
-        )
+        # [التعديل هنا] التقسيم الداخلي (Inner Split) مع الحفاظ على الـ Source-level grouping
+        # تقسيم إلى 7 أجزاء يعطينا تقريباً 14.3% للـ Validation (وهو يتطابق مع approximately 15% المذكورة بالورقة)
+        sgkf_inner = StratifiedGroupKFold(n_splits=7, shuffle=True, random_state=seed)
+        inner_splits = list(sgkf_inner.split(train_val_df['clean_text'], train_val_df['label'], groups=train_val_df['group_id']))
+        inner_train_idx, inner_val_idx = inner_splits[0] # أخذ أول جزء
         
-        # تحويلها إلى DataFrames
-        train_df = pd.DataFrame({'clean_text': train_texts, 'label': train_labels}).reset_index(drop=True)
-        val_df = pd.DataFrame({'clean_text': val_texts, 'label': val_labels}).reset_index(drop=True)
+        train_df = train_val_df.iloc[inner_train_idx].reset_index(drop=True)
+        val_df = train_val_df.iloc[inner_val_idx].reset_index(drop=True)
         
-        # تحويل البيانات إلى Dataset Format الخاصة بـ HuggingFace
         train_ds = Dataset.from_pandas(train_df[['clean_text', 'label']]).map(tokenize_function, batched=True)
         val_ds = Dataset.from_pandas(val_df[['clean_text', 'label']]).map(tokenize_function, batched=True)
         test_ds = Dataset.from_pandas(test_df[['clean_text', 'label']]).map(tokenize_function, batched=True)
 
-        # حساب أوزان الفئات بناءً على بيانات التدريب فقط
         classes = np.unique(train_df['label'])
         weights = compute_class_weight(class_weight='balanced', classes=classes, y=train_df['label'])
 
@@ -64,7 +61,7 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
             learning_rate=2e-5,
             per_device_train_batch_size=8,
             num_train_epochs=5,
-            load_best_model_at_end=True, # سيختار الأفضل بناءً على val_ds
+            load_best_model_at_end=True, 
             metric_for_best_model="qwk",
             save_total_limit=1,
             report_to="none"
@@ -76,18 +73,16 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
             model=model,
             args=training_args,
             train_dataset=train_ds,
-            eval_dataset=val_ds, # التقييم لاختيار الـ Checkpoint يتم هنا
+            eval_dataset=val_ds, 
             compute_metrics=compute_metrics,
         )
 
-        # التدريب
         t0 = time.time()
         trainer.train()
         total_train_time += (time.time() - t0)
 
-        # التقييم النهائي والأهم (على test_ds غير المرئية تماماً)
         t1 = time.time()
-        test_preds = trainer.predict(test_ds) # نستخدم predict للتقييم الخارجي
+        test_preds = trainer.predict(test_ds) 
         
         eval_res = test_preds.metrics
         
@@ -102,12 +97,10 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
         
         fold_results.append(cleaned_eval_res)
         
-        # حفظ التوقعات والاحتمالات للـ OOF
         oof_predictions[test_idx] = np.argmax(test_preds.predictions, axis=-1)
         oof_true[test_idx] = test_df['label'].values
         oof_probs[test_idx] = torch.nn.functional.softmax(torch.tensor(test_preds.predictions), dim=-1).numpy()
 
-    # Aggregate Metrics
     qwk_scores = [r['eval_qwk'] for r in fold_results]
     mae_scores = [r['eval_mae'] for r in fold_results]
     f1_scores = [r['eval_macro_f1'] for r in fold_results]
