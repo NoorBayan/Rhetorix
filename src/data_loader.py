@@ -35,7 +35,7 @@ def load_data(url="https://raw.githubusercontent.com/NoorBayan/Burhan/main/corpu
                     'text': combined_text, 
                     'label_text': effort,
                     'label': effort_map[effort],
-                    'group_id': ayah  # <--- [التعديل هنا] إضافة الآية كمصدر للتجميع (Source Group)
+                    'group_id': ayah 
                 })
                 break 
 
