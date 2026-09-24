@@ -16,7 +16,6 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
     def tokenize_function(examples):
         return tokenizer(examples["clean_text"], truncation=True, padding="max_length", max_length=128)
 
-    # [التعديل هنا] استخدام التقسيم المبني على المصدر للتقسيم الخارجي
     sgkf_outer = StratifiedGroupKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     
     fold_results = []
@@ -27,7 +26,6 @@ def run_5fold_cv(model_name, df, num_labels=3, use_ordinal=True, k_folds=5, seed
     total_train_time = 0
     total_inf_time = 0
 
-    # [التعديل هنا] تمرير الـ group_id لضمان عدم تسرب المصادر
     for fold, (train_val_idx, test_idx) in enumerate(sgkf_outer.split(df['clean_text'], df['label'], groups=df['group_id'])):
         print(f"\n--- Training Fold {fold+1}/{k_folds} ---")
         
