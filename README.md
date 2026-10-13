@@ -34,6 +34,7 @@ The repository utilizes the `RhetoriScale` dataset derived from the Burhan Class
   * `2` (High Effort): Highly dense, polysemous metaphors requiring deep exploration (16.17%).
 * **Data Preprocessing:** Before tokenization, text undergoes standard preprocessing using the `PyArabic` library (removal of diacritics and Alef normalization) to ensure consistency across vocabularies.
 
+
 ### 2. Code Information
 The codebase is modularly structured:
 - `pipeline.py`: Executes the Stratified 5-Fold Cross-Validation, splits inner subsets, computes cost-sensitive weights, and manages Out-Of-Fold evaluations.
