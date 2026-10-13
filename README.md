@@ -43,6 +43,7 @@ The codebase is modularly structured:
 - `data_loader.py`: Handles fetching and JSON parsing using `json-repair`.
 - `metrics.py`: Computes Accuracy, Macro-F1, QWK, and MAE.
 - `stats.py` & `visualization.py`: Generates the Wilcoxon test, confusion matrices, and error severity distributions.
+- The code is licensed under the MIT License, and the dataset is licensed under CC-BY 4.0
 
 ### 3. Requirements
 To replicate the environment locally, ensure the following dependencies are installed (Python 3.8+ and a CUDA-enabled GPU are recommended):
