@@ -1,10 +1,10 @@
-# 📖 Rhetorix: Ordinal Learning for Cognitive Processing Effort in Classical Arabic Rhetoric
+# 📖 Rhetorix: Distance-Aware Ordinal Learning for Processing-Effort Classification in Classical Arabic Rhetoric
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WGqLul_ENM3dytF-7V7bTtYlT36GFNb5?usp=sharing)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: CC-BY 4.0](https://img.shields.io/badge/License-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 
-This project bridges the gap between **Deep Learning (NLP)** and the **Digital Humanities**, specifically targeting Classical Arabic and Qur'anic rhetoric. We teach artificial intelligence not just to *detect* metaphors, but to predict the *processing effort* required to interpret them, modeling this inferential burden as an expert-derived graded scale.
+This repository contains the dataset, source code, and reproducibility pipeline for the AI Application paper focusing on predicting processing effort in Classical Arabic rhetorical texts. It formulates the prediction of expert-derived figurative interpretation effort as a distance-aware ordinal classification task.
 
 ---
 
@@ -12,52 +12,81 @@ This project bridges the gap between **Deep Learning (NLP)** and the **Digital H
 Are you a researcher in **Literary Theory, Applied Linguistics, Rhetoric, or Education**? This project is built with your theories in mind. 
 
 We recognize that language is not just zeros and ones. By integrating concepts like **Relevance Theory** and **Cognitive Pragmatics**, this computational framework offers tangible tools for your research:
+* 📚 **For Literary Critics & Theorists:** Explore how abstract theories of meaning-making (like graded salience and inferential burden) can be computationally modeled and validated.
+* 🖋️ **For Rhetoric Scholars:** Move beyond the simple binary question of "Is this a metaphor?" to a deeper understanding of textual density in Classical Arabic.
+* 🎓 **For Educators:** Explore how these processing-effort models can inform future text readability tools and guide the organization of graded curricula.
 
-* 📚 **For Literary Critics & Theorists:** Explore how abstract theories of meaning-making (like graded salience and inferential burden) can be computationally modeled and validated across texts.
-* 🖋️ **For Rhetoric & Arabic Scholars:** Move beyond the simple binary question of "Is this a metaphor?" to a deeper understanding of textual density and polysemy in Classical Arabic.
-* 🎓 **For Applied Linguists & Educators:** Explore how these processing-effort models can inform future text readability tools, guide the organization of graded curricula for Arabic learners, and support advanced language proficiency assessments.
-
----
-
-## 🚀 Try It Yourself (No Coding Required!)
-You do not need to install any software or know how to code to see this project in action. We have prepared an interactive environment for you.
-
-Click the badge below to open our **Google Colab Notebook**. This cloud-based tool allows you to run our experiment, explore the dataset, and see how the AI predicts cognitive effort step-by-step.
-
+### 🚀 Try It Yourself (No Coding Required!)
+You do not need to install any software or know how to code to see this project in action. Click the badge below to open our interactive **Google Colab Notebook**.
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WGqLul_ENM3dytF-7V7bTtYlT36GFNb5?usp=sharing)
 
-**How to use it:**
-1. Click the link above.
-2. Sign in with any Google account.
-3. Read through the explanations and click the "Play" `▶` button on each cell to run the code.
-4. Explore the `RhetoriScale` dataset and see the differences between *Low*, *Medium*, and *High* cognitive effort sentences.
-
 ---
 
-## 💻 For Computational Researchers & Data Scientists
+## 💻 For Computational Researchers & Data Scientists (Reproducibility)
 For NLP practitioners, this repository provides a reproducible pipeline for evaluating highly imbalanced, ordinal classification tasks in specialized historical text domains.
 
-### The Technical Challenge
-Traditional nominal classification (like Categorical Cross-Entropy) treats all errors equally. However, cognitive effort is a graded scale (`Low < Medium < High`). Predicting `High` when the true label is `Low` is a much worse error than predicting `Medium`. 
+### 1. Dataset Information (*RhetoriScale*)
+The repository utilizes the `RhetoriScale` dataset derived from the Burhan Classical Arabic rhetorical resource.
+* **Total Instances:** 965 expertly annotated rhetorical segments.
+* **Labels (Processing Effort):** 
+  * `0` (Low Effort): Highly conventional, transparent figurative language (4.66%).
+  * `1` (Medium Effort): Moderate inferential bridging required (79.17%).
+  * `2` (High Effort): Highly dense, polysemous metaphors requiring deep exploration (16.17%).
+* **Data Preprocessing:** Before tokenization, text undergoes standard preprocessing using the `PyArabic` library (removal of diacritics and Alef normalization) to ensure consistency across vocabularies.
 
-### Our Solution
-We implement a **Distance-Aware Ordinal Loss Function** that penalizes the transformer model based on the geometric distance of its errors. Integrated with models like **ARBERT** and evaluated via a strict source-grouped Stratified 5-Fold Cross-Validation protocol (preventing data leakage), our framework effectively eliminates Severity-2 errors and significantly improves the Quadratic Weighted Kappa (QWK) score compared to standard categorical baselines.
+### 2. Code Information
+The codebase is modularly structured:
+- `pipeline.py`: Executes the Stratified 5-Fold Cross-Validation, splits inner subsets, computes cost-sensitive weights, and manages Out-Of-Fold evaluations.
+- `losses.py`: Implements the `OrdinalCrossEntropyLoss`, penalizing predictions based on ordinal distance.
+- `custom_trainer.py`: HuggingFace `Trainer` override to inject the ordinal loss.
+- `data_loader.py`: Handles fetching and JSON parsing using `json-repair`.
+- `metrics.py`: Computes Accuracy, Macro-F1, QWK, and MAE.
+- `stats.py` & `visualization.py`: Generates the Wilcoxon test, confusion matrices, and error severity distributions.
 
-
-
----
-
-## 📊 The Dataset: *RhetoriScale*
-The dataset consists of Classical Arabic rhetorical segments expertly annotated into three ordinal levels of interpretive burden:
-* **0 (Low Effort):** Highly conventional, transparent figurative language.
-* **1 (Medium Effort):** Moderate inferential bridging required.
-* **2 (High Effort):** Highly dense, polysemous, or historically opaque metaphors requiring deep contextual exploration.
-
-*(Note: The full dataset is handled in accordance with the paper's data availability statement to protect the integrity of the expert annotations).*
-
----
-
-## 📬 Contact
-For technical inquiries regarding the code or models, please open an issue in this repository. For academic and theoretical collaborations, please reach out to the corresponding authors via the emails provided in the paper.
+### 3. Requirements
+To replicate the environment locally, ensure the following dependencies are installed (Python 3.8+ and a CUDA-enabled GPU are recommended):
+```text
+torch>=2.0.0
+transformers>=4.30.0
+datasets>=2.12.0
+scikit-learn>=1.2.2
+pandas>=2.0.0
+numpy>=1.24.0
+json-repair>=0.10.0
+pyarabic>=0.6.15
+matplotlib>=3.7.0
+seaborn>=0.12.2
+scipy>=1.10.0
+tabulate>=0.9.0
 ```
+
+### 4. Usage Instructions
+You can run the provided scripts or use the Google Colab environment.
+**Step 1: Load Data**
+```python
+from src.data_loader import load_data
+df, label_encoder = load_data()
+```
+**Step 2: Train Model (Distance-Aware Ordinal Loss)**
+```python
+from src.pipeline import run_5fold_cv
+MODEL_NAME = "UBC-NLP/ARBERT"
+metrics, fold_results, preds, true, probs = run_5fold_cv(model_name=MODEL_NAME, df=df, use_ordinal=True)
+```
+**Step 3: Ablation Study (Standard Categorical CE)**
+```python
+metrics_baseline = run_5fold_cv(model_name=MODEL_NAME, df=df, use_ordinal=False)
+```
+
+### 5. Methodology Summary
+1. **Data Partitioning:** Stratified 5-Fold CV scheme. Within each outer fold, an inner 85/15 split is performed for internal validation.
+2. **Cost-Sensitive Weighting:** Inverse-frequency class weights are computed *exclusively* from the inner training subset to prevent data leakage.
+3. **Distance-Aware Optimization:** The training objective minimizes a weighted categorical cross-entropy loss augmented by a distance penalty term.
+4. **Checkpoint Selection:** The checkpoint achieving the highest Quadratic Weighted Kappa (QWK) on the internal validation set is selected for final testing on the blind outer fold.
+
+---
+
+
+
+This dataset and codebase are released under the **Creative Commons Attribution 4.0 International (CC-BY 4.0)** license. It is freely available for academic and non-commercial research purposes.
 
